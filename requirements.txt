@@ -1,0 +1,4 @@
+filemagic
+elasticsearch
+r2pipe
+yara-python
