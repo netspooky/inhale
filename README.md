@@ -15,7 +15,7 @@ or a low cost computer like a Raspberry Pi.
 
 ## Install
 
-This tool is built to run on Linux using Python3, ElasticSearch, radare2, yara and binwalk. Here are some of the basic instructions to install.
+This tool is built to run on Linux using Python3, ElasticSearch, radare2, yara and binwalk. jq is also needed to pretty print output from the database. Here are some of the basic instructions to install.
 
 ### Python3
 
@@ -104,7 +104,7 @@ Add directory 'malwarez' to database
 
 Download this file and add to the database
 
-    python inhale.py -u https://thugcrowd.com/chal/skull
+    python3 inhale.py -u https://thugcrowd.com/chal/skull
 
 Download everything in this remote directory, tag it all as "phishing":
 
