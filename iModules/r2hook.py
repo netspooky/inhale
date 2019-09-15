@@ -54,6 +54,5 @@ binMeta = [ "arch",
 def getBinInfo(inputfile):
     r = r2pipe.open(inputfile)
     r2out = r.cmd('ij')
-    print(r2out)
     binInfo = json.loads(r2out)
     return binInfo
