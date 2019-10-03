@@ -139,9 +139,10 @@ def yaraMatch(data):
 def binWalkScan(filename):
     sigz = {}
     for module in binwalk.scan(filename, signature=True, quiet=True):
-        sigz[module.name] = {}
+        sigz[module.name] = []
         for result in module.results:
-            sigz[module.name]["0x%.8X" %result.offset] = result.description
+            preppedResult = {"offset": "0x%.8X" %result.offset, "description": result.description}
+            sigz[module.name].append(preppedResult)
             print ("{}{}  0x{:08X}{} {}".format(side,cPURP,result.offset,e,result.description))
     return sigz
 
