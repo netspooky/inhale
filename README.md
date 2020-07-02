@@ -118,10 +118,8 @@ You can pass your own yara rules with -y, this is a huge work in progress and al
 
 ### Querying the Database
 
-#### query.py Script
-A simple example:
-
-Query DB for "something" and show fields "filename" and "sha1".
+#### Using The query.py Script
+Query the DB for "something" and show fields "filename" and "sha1".
 
     python3 query.py -q something -s filename,sha1
 
@@ -146,14 +144,27 @@ optional arguments:
 
 More examples:
 
-```
-python3 query.py -q exe -imphash
-python3 query.py -q PE -sf filename,sha256
-python3 query.py -q powershell -sf yara
-python3 query.py -q PE -sf filename,sha256,url -imphash
-```
+Query for "exe" and then calculate ImpHash on the returned query hits:
 
-#### Bash Script
+    python3 query.py -q exe -imphash
+
+Query for "PE" and then display the "filename" and "sha256" fields of the returned query hits:
+
+    python3 query.py -q PE -sf filename,sha256
+
+Query for "powershell" and then display the "yara" field of the returned query hits:
+
+    python3 query.py -q powershell -sf yara
+
+Query for "PE" and then display the "filename", "sha256", "url" fields and calculate the ImpHash for each of the returned query hits:
+    
+    python3 query.py -q PE -sf filename,sha256,url -imphash
+
+Query for "PE" and then display the DLL imports for each of the returned query hits:
+
+    python3.8 query.py -q PE -imports
+
+#### Using The Bash Script
 Use db.sh to query (Soon to be a nice script)
 
     db.sh *something* | jq .
