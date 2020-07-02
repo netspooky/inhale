@@ -118,6 +118,42 @@ You can pass your own yara rules with -y, this is a huge work in progress and al
 
 ### Querying the Database
 
+#### query.py Script
+A simple example:
+
+Query DB for "something" and show fields "filename" and "sha1".
+
+    python3 query.py -q something -s filename,sha1
+
+You can pass as many fields as you want using the switch `-s` or `-sf` which stands for show or show fields. Just make sure that the fields you pass are comma separated.
+
+The script's help output:
+
+```
+python3 query.py -h
+usage: query.py [-h] [-q QUERY] [-sf SHOWFIELDS] [-imphash] [-imports]
+
+Query Inhale DB
+
+optional arguments:
+  -h, --help      show this help message and exit
+  -q QUERY        Search Query
+  -sf SHOWFIELDS  Show Fields. Must be comma separated. Ex: SHA1,filename,filetype,filesize
+  -imphash        Calculate ImpHash. For Windows PE files
+  -imports        Show Imported DLLs. For Windows PE files
+
+```
+
+More examples:
+
+```
+python3 query.py -q exe -imphash
+python3 query.py -q PE -sf filename,sha256
+python3 query.py -q powershell -sf yara
+python3 query.py -q PE -sf filename,sha256,url -imphash
+```
+
+#### Bash Script
 Use db.sh to query (Soon to be a nice script)
 
     db.sh *something* | jq .

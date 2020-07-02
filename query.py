@@ -6,7 +6,7 @@ import pefile
 ### PARSER ARGUMENTS ###########################################################
 parser = argparse.ArgumentParser(description='Query Inhale DB')
 parser.add_argument('-q', dest='query', help='Search Query')
-parser.add_argument('-sf', dest='showFields', help='Show Fields. Must be comma seperated. Ex: SHA1,filename,filetype,filesize')
+parser.add_argument('-sf', dest='showFields', help='Show Fields. Must be comma separated. Ex: SHA1,filename,filetype,filesize')
 parser.add_argument('-imphash', dest='imphash', help="Calculate ImpHash. For Windows PE files", action="store_true")
 parser.add_argument('-imports', dest='imports', help='Show Imported DLLs. For Windows PE files', action="store_true")
 
