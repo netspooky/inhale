@@ -81,7 +81,7 @@ def elasticPost(fileinfo):
     es = Elasticsearch()
     es.indices.create(index='inhaled', ignore=400)
     try:
-        es.index(index="inhaled", doc_type="file", body=fileinfo)
+        es.index(index="inhaled", body=fileinfo)
         print("{}{} [+] Added {}{}{}!".format(side,e,cCYAN,fileinfo["filename"],e))
     except:
         print("{}{} {}[!] Could not add {}{} - Try passing -b to disable binwalk signatures!".format(side,e,cRED,fileinfo["filename"],e))
