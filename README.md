@@ -15,15 +15,50 @@ or a low cost computer like a Raspberry Pi.
 
 ## Install
 
+### Docker
+The built image size is `1.26GB`.
+
+Make sure you have docker and docker-compose installed:
+1. https://docs.docker.com/get-docker/
+2. https://docs.docker.com/compose/install/
+
+Then clone the repo or download and extract the project zip file. After that, build and run the docker image like so:
+```shell
+$ cd inhale # CD into project directory
+$ docker-compose up -d # build (if image doesn't exist) and run as daemon
+$ docker attach inhale # Attach to running container to enter shell
+```
+
+Once you've attach to the container you should have an interactive shell. Before you start using the project must do one last thing, run the elasticsearch server:
+
+`$ service elasticsearch start`
+
+And that it is, you can use the project:
+
+```
+$ python inhale.py -h
+$ exit # exit session and shutdown container
+```
+
+**Note the following:**
+* The whole `app/` project folder is mounted in the container.
+    * This means that code changes can be done on the fly, no need to rebuild the container image.
+    * Files or samples can be introduced to the container easily, just drop them in the `app/` directory.
+    * The `app/files` directory which holds files and directories downloaded by the app can be accessible from the host running the container.
+        * Meaning files are not isolated from the host.
+    * Download files are kept on the host while the elasticsearch DB is kept inside the container.
+* Currently, when you attach to the container you will get a session with root privileges.
+
+### Linux
 This tool is built to run on Linux using Python3, ElasticSearch, radare2, yara and binwalk. jq is also needed to pretty print output from the database. Here are some of the basic instructions to install.
 
-### Python3
+#### Python3
 
 Install requirements
 
     python3 -m pip install -r requirements.txt
 
-### Installing ElasticSearch (Debian)
+#### Installing ElasticSearch (Debian)
 
 [Documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html)
 
@@ -37,7 +72,7 @@ You can also install manually by following [this documentation](https://www.elas
 
 Additionally you can [set up a full ELK stack](https://logz.io/learn/complete-guide-elk-stack/#installing-elk) for visualization and data analysis purposes. It is not necessary for using this tool.
 
-### Installing radare2
+#### Installing radare2
 
 It's important to install radare2 from the [repo](https://github.com/radare/radare2), and not your package manager. Package manager versions don't come with all the bells and whistles required for inhale.
 
@@ -45,7 +80,7 @@ It's important to install radare2 from the [repo](https://github.com/radare/rada
     cd radare2
     sys/install.sh
 
-### Installing Yara
+#### Installing Yara
 
 [Documentation](https://yara.readthedocs.io/en/v3.10.0/gettingstarted.html)
 
@@ -63,7 +98,7 @@ If you get any errors about shared objects, try this to fix it.
     sudo sh -c 'echo "/usr/local/lib" >> /etc/ld.so.conf'
     sudo ldconfig
 
-### Installing binwalk
+#### Installing binwalk
 
 It's most likely best to simply install binwalk from the [repo](https://github.com/ReFirmLabs/binwalk). 
 

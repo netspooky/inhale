@@ -1,0 +1,13 @@
+version: '3'
+services:
+  inhale:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    image: inhale
+    container_name: inhale
+    volumes:
+      - "./app/:/app/"
+    entrypoint: ["/bin/bash"]
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
