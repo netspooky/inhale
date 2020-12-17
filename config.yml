@@ -1,0 +1,34 @@
+# config.yml
+
+options:
+  enable_database: False # False to run without a database
+  use_proxy: False # configure in proxies section
+  random_ua: False # Randomize UA from a list of UAs in ./assets/
+  copy_all_files: False # This moves any analyzed file into the ./files/ directory
+  output_to_web: False
+  file_timeout: 5 # timeout for downloading a file
+
+analyst_opts:
+  analyst_mode: False   # Extended symbols from r2
+  yara_rules: 'YaraRules/index.yar' # Your default path for yara rules.
+  yara_timeout: 10      # timeout for analyzing yara files
+  telf_hash: True       # Enable only if using telfhash
+  grab_syms: False      # Document all symbols from a file
+  unpack_packers: False # Unpack packed files and reanalyze 
+  unzip_archives: False # Unzip archives and reanalyze
+
+web:
+  gen_html: False
+  webdir: "/var/www/html/" # The actual web directory
+  fqdn: "http://threat.land" # Your website
+  in_path: "/var/www/html/inhaled/" # The path to inhale output
+  ex_path: "/var/www/html/exhaled/" # The path for db query cache output
+
+proxies:
+ - 'https://127.0.0.1'
+
+# Add API keys to services you want to connect
+api_keys:
+  greynoise: ''
+  vt: ''
+  shodan: ''

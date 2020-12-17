@@ -73,22 +73,59 @@ It's most likely best to simply install binwalk from the [repo](https://github.c
 
 More information on installing additional features for binwalk is located [here](https://github.com/ReFirmLabs/binwalk/blob/master/INSTALL.md).
 
+### Installing telfhash/tshl
+
+This is a library that hashes sections of ELF files for malware family analysis. telfhash relies on tlsh, so instructions for installing both are as follows:
+
+Set up tlsh
+
+    git clone https://github.com/trendmicro/tlsh
+    cd tlsh
+    ./make.sh
+    cd py_ext/
+    python3 ./setup.py build
+    sudo python3 ./setup.py install
+
+Set up telfhash
+
+    git clone https://github.com/trendmicro/telfhash
+    cd telfhash
+    sudo python3 setup.py install
+
+### Setting up web server
+
+If you want to use a web server to host inhale output to share, set the variables in config.yml to the appropriate paths, and make sure that the directories exist!
+
+    web:
+      gen_html: False
+      webdir: "/var/www/html/" # The actual web directory
+      fqdn: "http://threat.land" # Your website
+      in_path: "/var/www/html/inhaled/" # The path to inhale output
+      ex_path: "/var/www/html/exhaled/" # The path for db query cache output
+
+To use html output, run inhale like this:
+
+    python3 inhale.py [all your args here] --html
+
 ## Usage 
 
 Specify the file you are scraping by type:
 
-    -f infile    
-    -d directory
-    -u url
-    -r recursive url
+    -f INFILE      Analyze a single file
+    -d DIRECTORY   Analyze a directory of files
+    -u URLFILE     Analyze a remote file (url)
+    -r RDIRECTORY  Analyze a remote directory (url)
+    -l URLLIST     Analyze a list of URLs in a text file
+
 
 Other options:
 
-    -t TAGS        Additional Tags
-    -b             Turn off binwalk signatures with this flag
-    -y YARARULES   Custom Yara Rules
-    -o OUTDIR      Store scraped files in specific output dir (default:./files/<date>/)
+    -t TAGS        Add additional tags to the output.
+    -b             Turn off binwalk signatures
+    -y YARARULES   Specify custom Yara Rules
+    -o OUTDIR      Store scraped files in specific output dir (default: ./files/<date>/)
     -i             Just print info, don't add files to database
+    --html         Save output as html to the webdir.
 
 ## Examples
 
@@ -100,7 +137,7 @@ View info on /bin/ls, but don't add to the database
 
 Add directory 'malwarez' to database
 
-    python3 inhale.py -d malwarez
+    python3 inhale.py -d malwarez/
 
 Download this file and add to the database
 
@@ -180,7 +217,7 @@ You may have an older version of elasticSearch. You can upgrade, or you can incr
 ## Future Features
 
 * Re-doing the bot plugin for Discord / Matrix
-* Additional binary analysis features - pulling import/export tables, hashing of specific structures in the header, logging all strings etc.
+* Additional binary analysis features - pulling import/export tables, hashing of specific structures in the header, logging all strings etc. Some implemented in telfhash!
 * Checking if the file is the database before adding. This feature was removed previously due to specific issues with older versions of ES.
 * Configuration options for requests such as: user agent, timeout, proxy etc.
 * Dockerization of this entire project.

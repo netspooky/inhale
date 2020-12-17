@@ -13,24 +13,28 @@ import yara
 from datetime import datetime
 from elasticsearch import Elasticsearch
 from yara import CALLBACK_MATCHES
+import time
 
 import iModules
 from iModules import *
 
+CONFIG = helper.CONFIG # This imports our config file for use
+
 ### PARSER ARGUMENTS ###########################################################
 parser = argparse.ArgumentParser(description='inhale')
 
-parser.add_argument('-f', dest='infile', help='File to add')
-parser.add_argument('-d', dest='directory', help='Directory to add')
-parser.add_argument('-r', dest='rDirectory', help='Remote directory (URL)')
-parser.add_argument('-u', dest='urlFile', help='File from a URL')
-
-parser.add_argument('-t', dest='tags', help='Additional Tags')
-parser.add_argument('-b', dest='binWalkSigs', help="Turn off binwalk signatures with this flag", action="store_true")
-parser.add_argument('-y', dest='yaraRules', action='store', help="Custom Yara Rules")
+parser.add_argument('-f', dest='infile', help='Analyze a single file')
+parser.add_argument('-d', dest='directory', help='Analyze a directory of files')
+parser.add_argument('-u', dest='urlFile', help='Analyze a remote file (url)')
+parser.add_argument('-r', dest='rDirectory', help='Analyze a remote directory (url)')
+parser.add_argument('-l', dest='urlList', help='Analyze a list of URLs in a text file')
+parser.add_argument('-t', dest='tags', help='Add additional tags to the output.')
+parser.add_argument('-b', dest='binWalkSigs', help="Turn off binwalk signatures", action="store_true")
+parser.add_argument('-y', dest='yaraRules', action='store', help="Specify custom Yara Rules")
 parser.add_argument('-o', dest='outdir', action='store',
                     help="Store scraped files in specific output dir (default: ./files/<date>/)")
 parser.add_argument('-i', dest='noAdd', help="Just print info, don't add files to database", action="store_true")
+parser.add_argument('--html', dest='htmlout', help="Save output as html to the webdir.", action="store_true")
 
 ### Global Vars ################################################################
 
@@ -123,6 +127,27 @@ def getMagic(afile):
         filetype = m.id_filename(afile)
     return filetype
 
+def setMagicFlags(m):
+    # 0 Regular File
+    # 1 ELF
+    # 2 PE
+    # 3 PDF
+    # 4 Archive
+    if m[0:3] == "ELF":
+      return 1
+    elif m[0:2] == "PE":
+      return 2
+    elif m[0:3] == "PDF":
+      return 3
+    elif "archive" in m:
+      return 4
+    elif "bzip2" in m:
+      return 4
+    elif "gzip" in m:
+      return 4
+    else:
+      return 0
+
 def getSize(afile):
     statinfo = os.stat(afile)
     return statinfo.st_size
@@ -132,36 +157,36 @@ def urlFind(string):
     url = re.findall(b'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', string)
     return url
 
-def yaraMatch(data):
-  print ("{} - {}{} {}".format(side,cRED,data["rule"],e))
-  return yara.CALLBACK_CONTINUE
-
 def binWalkScan(filename):
     sigz = {}
     for module in binwalk.scan(filename, signature=True, quiet=True):
-        sigz[module.name] = []
+        sigz[module.name] = {}
         for result in module.results:
-            preppedResult = {"offset": "0x%.8X" %result.offset, "description": result.description}
-            sigz[module.name].append(preppedResult)
-            print ("{}{}  0x{:08X}{} {}".format(side,cPURP,result.offset,e,result.description))
+            sigz[module.name]["0x%.8X" %result.offset] = result.description
     return sigz
+
+def yaraMatch(data):
+  return yara.CALLBACK_CONTINUE
 
 ### Parsing Logic ##############################################################
 
 def parseFile(inputfile):
-    finfo    = {}
-    binInfo  = r2hook.getBinInfo(inputfile)
+  try:
+    finfo    = {} # This holds all of the scan data 
+    binInfo  = r2hook.getBinInfo(inputfile) # The binary data from radare2
     filename = inputfile
-    filetype = getMagic(filename)
+    filetype = getMagic(filename) # Get filetype from magic value
+    fileFlag = setMagicFlags(filetype) # Get magic code, if any
     baseName = filename.split("/")[-1:][0]
     ext      = baseName.split(".")[-1:][0]
     if ext == baseName:
         ext == "NONE" 
     bf       = open(filename, "rb") 
-    binFile  = bf.read()            
-    urls     = set(urlFind(binFile))
-    fsize    = getSize(filename)
-    hashes   = getHashes(filename)
+    binFile  = bf.read()             # A buffer of the binary file
+    urls     = set(urlFind(binFile)) # Finding urls in the file
+    fsize    = getSize(filename)     # Get file size
+    hashes   = getHashes(filename)   # Get MD5, SHA1, and SHA256
+
     ###- Building the data structure to post to the database. -###
     finfo["filename"] = filename
     finfo["file_ext"] = ext
@@ -171,139 +196,68 @@ def parseFile(inputfile):
     finfo["sha1"]     = hashes["sha1"]
     finfo["sha256"]   = hashes["sha256"]
     finfo["added"]    = datetime.now()
-    finfo["tags"]     = tags
+    finfo["tags"]     = tags # Tags from command line
+
     if "bin" in binInfo:
-        b_arch     = binInfo["bin"]["arch"]
-        b_baddr    = binInfo["bin"]["baddr"]
-        b_binsz    = binInfo["bin"]["binsz"]
-        b_bits     = binInfo["bin"]["bits"]
-        b_canary   = binInfo["bin"]["canary"]
-        b_class    = binInfo["bin"]["class"]
-        b_compile  = binInfo["bin"]["compiled"]
-        b_dbgfile  = binInfo["bin"]["dbg_file"]
-        b_intrp    = binInfo["bin"]["intrp"]
-        b_lang     = binInfo["bin"]["lang"]
-        b_lsyms    = binInfo["bin"]["lsyms"]
-        b_machine  = binInfo["bin"]["machine"]
-        b_os       = binInfo["bin"]["os"]
-        b_pic      = binInfo["bin"]["pic"]
-        b_relocs   = binInfo["bin"]["relocs"]
-        b_rpath    = binInfo["bin"]["rpath"]
-        b_stripped = binInfo["bin"]["stripped"]
-        b_subsys   = binInfo["bin"]["subsys"]
-        # Fill the file info struct
-        finfo["r2_arch"]     = b_arch
-        finfo["r2_baddr"]    = b_baddr
-        finfo["r2_binsz"]    = b_binsz
-        finfo["r2_bits"]     = b_bits
-        finfo["r2_canary"]   = b_canary
-        finfo["r2_class"]    = b_class
-        finfo["r2_compiled"] = b_compile
-        finfo["r2_dbg_file"] = b_dbgfile
-        finfo["r2_intrp"]    = b_intrp
-        finfo["r2_lang"]     = b_lang
-        finfo["r2_lsyms"]    = b_lsyms
-        finfo["r2_machine"]  = b_machine
-        finfo["r2_os"]       = b_os
-        finfo["r2_pic"]      = b_pic
-        finfo["r2_relocs"]   = b_relocs
-        finfo["r2_rpath"]    = b_rpath
-        finfo["r2_stripped"] = b_stripped
-        finfo["r2_subsys"]   = b_subsys
+        # Fill the file info struct if it's a binary
+        finfo["r2_arch"]     = binInfo["bin"]["arch"]
+        finfo["r2_baddr"]    = binInfo["bin"]["baddr"]
+        finfo["r2_binsz"]    = binInfo["bin"]["binsz"]
+        finfo["r2_bits"]     = binInfo["bin"]["bits"]
+        finfo["r2_canary"]   = binInfo["bin"]["canary"]
+        finfo["r2_class"]    = binInfo["bin"]["class"]
+        finfo["r2_compiled"] = binInfo["bin"]["compiled"]
+        finfo["r2_dbg_file"] = binInfo["bin"]["dbg_file"]
+        finfo["r2_intrp"]    = binInfo["bin"]["intrp"]
+        finfo["r2_lang"]     = binInfo["bin"]["lang"]
+        finfo["r2_lsyms"]    = binInfo["bin"]["lsyms"]
+        finfo["r2_machine"]  = binInfo["bin"]["machine"]
+        finfo["r2_os"]       = binInfo["bin"]["os"]
+        finfo["r2_pic"]      = binInfo["bin"]["pic"]
+        finfo["r2_relocs"]   = binInfo["bin"]["relocs"]
+        finfo["r2_rpath"]    = binInfo["bin"]["rpath"]
+        finfo["r2_stripped"] = binInfo["bin"]["stripped"]
+        finfo["r2_subsys"]   = binInfo["bin"]["subsys"]
+
     if "core" in binInfo:
-        b_format   = binInfo["core"]["format"]
-        b_iorw     = binInfo["core"]["iorw"]
-        b_type     = binInfo["core"]["type"]
-        finfo["r2_format"]   = b_format
-        finfo["r2_iorw"]     = b_iorw
-        finfo["r2_type"]     = b_type
-    ###- Printing the Output -###
-    print(divline)
-    print("{} Filename │ {}{}".format(side,e,filename))
-    print("{}  FileExt │ {}{}".format(side,e,ext))
-    print("{} Filesize │ {}{}".format(side,e,fsize))
-    print("{} Filetype │ {}{}".format(side,e,filetype))
-    print("{}      MD5 │ {}{}".format(side,e,hashes["md5"]))
-    print("{}     SHA1 │ {}{}".format(side,e,hashes["sha1"]))
-    print("{}   SHA256 │ {}{}".format(side,e,hashes["sha256"]))
-    print("{}──────────┼{}{}".format(side,"─"*68,e))
-    print("{}{} BIN INFO {}│{}".format(side,cYEL,cCYAN,e))
-    if "bin" in binInfo:
-        print("{}     Arch │ {}{}".format(side,e,b_arch))
-        print("{} baseAddr │ {}0x{:x}".format(side,e,b_baddr))
-        print("{}  binSize │ {}{}".format(side,e,b_binsz))
-        print("{}     Bits │ {}{}".format(side,e,b_bits))
-        print("{}   Canary │ {}{}".format(side,e,b_canary))
-        print("{}    Class │ {}{}".format(side,e,b_class))
-        print("{} Compiled │ {}{}".format(side,e,b_compile))
-        print("{} dbg_file │ {}{}".format(side,e,b_dbgfile))
-        print("{}  Interp. │ {}{}".format(side,e,b_intrp))
-        print("{} Language │ {}{}".format(side,e,b_lang))
-        print("{}    lSyms │ {}{}".format(side,e,b_lsyms))
-        print("{}  Machine │ {}{}".format(side,e,b_machine))
-        print("{}       OS │ {}{}".format(side,e,b_os))
-        print("{}      PIC │ {}{}".format(side,e,b_pic))
-        print("{}   Relocs │ {}{}".format(side,e,b_relocs))
-        print("{}    rPath │ {}{}".format(side,e,b_rpath))
-        print("{} Stripped │ {}{}".format(side,e,b_stripped))
-        print("{}  Subsys. │ {}{}".format(side,e,b_subsys))
-    if "core" in binInfo:
-        print("{}   Format │ {}{}".format(side,e,b_format))
-        print("{}     iorw │ {}{}".format(side,e,b_iorw))
-        print("{}     Type │ {}{}".format(side,e,b_type))
-        print("{}──────────╯ {}".format(side,e))
-    ###- Other matches -###
-    print("{}{} YARA {}".format(side,cYEL,e))
-    matches = rules.match(data=binFile, callback=yaraMatch, which_callbacks=CALLBACK_MATCHES,timeout=10)
-    yMatch = [] 
-    if len(matches) == 0:
-        print("{}  No Matches{}".format(side,e))
-    else:
+        # These are extra sections that sometimes don't appear in r2 output
+        finfo["r2_format"]   = binInfo["core"]["format"]
+        finfo["r2_iorw"]     = binInfo["core"]["iorw"]
+        finfo["r2_type"]     = binInfo["core"]["type"]
+
+    ### Binwalk ###
+    if bwSigz:
+        bwSigs = binWalkScan(inputfile)
+        finfo["binwalk"] = bwSigs
+
+    ### Yara ###
+    yaraTimeout = CONFIG["analyst_opts"]["yara_timeout"]
+    matches = rules.match(data=binFile, callback=yaraMatch, which_callbacks=CALLBACK_MATCHES,timeout=yaraTimeout)
+    yMatch  = []  # A list of yara rule matches
+    if len(matches) > 0:
         for match in matches:
             yMatch.append(match.rule)
     finfo["yara"] = yMatch
-    if bwSigz:
-        print("{}{} BINWALK {}".format(side,cYEL,e))
-        bwSigs = binWalkScan(inputfile)
-        finfo["binwalk"] = bwSigs
+    
+    ### URL Finder ###
     if urls:
         urlStr = []
-        print("{}{} FOUND \033[31m{}{} URLS\033[0m".format(side,cYEL,len(urls),cYEL))
         for url in urls:
-            print("{} - {}{}".format(side,e,url.decode("utf-8")))
             urlStr.append(url.decode("utf-8"))
         finfo["urls"] = urlStr
+
+    ### telfhash ###
+    if fileFlag == 1:
+        th = r2hook.telfhasher(filename)
+        if len(th) > 1:
+            finfo["telfhash"] = th
+
     bf.close()
     return finfo
-
-### File Scraping ##############################################################
-
-# Grab a single file from a URL 
-def getSingleFile(fUrl,fpath):
-    print("{}{} Grabbing file from {}...".format(side,e,fUrl))
-    rfile = fUrl.split("/")[-1:]
-    url = re.compile(r"https?://")
-    urlDir = url.sub('',fUrl.strip().strip('/'))
-    fpath = fpath + urlDir
-    try:
-        dlfile = requests.get(fUrl,timeout=5)
-        os.makedirs(os.path.dirname(fpath),exist_ok=True)
-        open(fpath, 'wb').write(dlfile.content)
-        return fpath
-    except:
-        print("{}{}   {}> FAILED!{}".format(side,e,cRED,e))
-        print(endline)
-        exit()
-
-# Parse a remote directory and give the path back to the main function
-def parseDir(rDirectory,fpath):
-    url = re.compile(r"https?://")
-    urlDir = url.sub('',rDirectory.strip().strip('/'))
-    fpath = fpath + urlDir
-    print("{}{} Scraping files... saving to {}{}{}".format(side,e,cCYAN,fpath,e))
-    os.makedirs(os.path.dirname(fpath),exist_ok=True)
-    rDownload.download_directory(rDirectory,fpath)
-    return fpath
+  except Exception as e:
+    print(e)
+    print("Error processing file!")
+    return
 
 ### Main logic #################################################################
 if __name__ == '__main__':
@@ -315,8 +269,9 @@ if __name__ == '__main__':
     urlFile    = args.urlFile
     tags       = args.tags
     bwSigz     = args.binWalkSigs
+    urlList    = args.urlList
 
-    ###- Switches -###
+    ###- Command Line Switches -###
     if args.yaraRules:
         rules = yara.compile(args.yaraRules)
     else:
@@ -337,14 +292,30 @@ if __name__ == '__main__':
         tags = args.tags
     else:
         tags = ""
+
+    ###- Config File Switches -###
+    if CONFIG["options"]["enable_database"]:
+        add2db = 1
+    else:
+        add2db = 0
+
     ### End Switches
-    print(cPNK + banner + e)
-    print(startline)
-    print("{} * T A S K S * {}".format(side,e))
+    ansiout = ""
+    ansiout += cPNK + banner + e + "\n"
+    ansiout += startline + "\n"
+    ansiout += "{} * T A S K S * {}\n".format(side,e)
+
+    ###-- Processing single local file -----------------------------------------
     if infile:
-        print("{}{} + Printing information for {}{}{}".format(side,e,cCYAN,infile,e))
+        ansiout += "{}{} + Analyzing {}{}{}\n".format(side,e,cCYAN,infile,e)
         try:
             inn = parseFile(infile)
+            ansiout += outputs.printAnsi(inn) # Make an option 
+            ansiout += endline
+            print(ansiout)
+            if args.htmlout:
+                outpath = outputs.generateHTML(ansiout,CONFIG["web"]["in_path"],CONFIG["web"]["fqdn"])
+                print("HTML output is here! {}".format(outpath))
         except BrokenPipeError:
             print("{}{} {}[!] File not found!{}".format(side,e,cRED,e))
             print(endline)
@@ -353,38 +324,106 @@ if __name__ == '__main__':
             elasticPost(inn)
         else:
             z = 0
+
+    ###-- Processing files from local directory --------------------------------
     elif directory:
         dirlist = rGlob(directory,"*")
+        print(dirlist)
         if len(dirlist) > 0:
-            print("{}{} + Printing information for all files in {}{}{}".format(side,e,cCYAN,directory,e))
+            ansiout += "{}{} + Analyzing all files in {}{}{}\n".format(side,e,cCYAN,directory,e)
             if add2db:
-                print("{}{} + Adding Directory {}{}{} to database".format(side,e,cCYAN,directory,e))
+                ansiout += "{}{} + Adding Directory {}{}{} to database\n".format(side,e,cCYAN,directory,e)
             for ff in dirlist:
-                inn = parseFile(ff)
-                if add2db:
-                    elasticPost(inn)
+                try:
+                    inn = parseFile(ff)
+                    ansiout += outputs.printAnsi(inn) # Make an option 
+                    if add2db:
+                        elasticPost(inn)
+                except:
+                    ansiout += "Couldn't process {}...continuing!".format(ff)
+                    continue
+            ansiout += endline
+            print(ansiout)
+            if args.htmlout:
+                outpath = outputs.generateHTML(ansiout,CONFIG["web"]["in_path"],CONFIG["web"]["fqdn"])
+                print("HTML output is here! {}".format(outpath))
         else:
             print("{}{}{} [!] No files found!{}".format(side,e,cRED,e))
-            print(endline)
             sys.exit(1)
+
+    ###-- Processing single file from url --------------------------------------
     elif urlFile:
-        singleFile = getSingleFile(urlFile,fpath)
+        singleFile, fHeaders, fOutput = rDownload.getSingleFile(urlFile,fpath)
+        if singleFile == 0:
+            ansiout += fOutput
+            print(ansiout)
+            print(endline)
+            exit()
+        ansiout += fOutput
+        headersList = []
+        for key, value in fHeaders.items():
+            headersList.append("{}: {}".format(key, value)) # Create a header list
         inn = parseFile(singleFile)
+        inn["headers"] = headersList # Add the headers
+        ansiout += outputs.printAnsi(inn) # Make an option 
+        ansiout += endline
+        print(ansiout)
+        if args.htmlout:
+            outpath = outputs.generateHTML(ansiout,CONFIG["web"]["in_path"],CONFIG["web"]["fqdn"])
+            print("HTML output is here! {}".format(outpath))
         if add2db:
             inn["url"] = urlFile
             elasticPost(inn)
+
+    ###-- Processing a list of urls with files ---------------------------------
+    elif urlList:
+        ansiout += "{}{} + Analyzing all files in {}{}{}".format(side,e,cCYAN,urlList,e)
+        with open(urlList,"r") as f:
+            lines = f.readlines()
+            for l in lines:
+                try:
+                    l = l.split("\n")[0]
+                    singleFile, fHeaders, fOutput = rDownload.getSingleFile(l,fpath)
+                    ansiout += fOutput
+                    headersList = []
+                    for key, value in fHeaders.items(): # maybe abstract this to a utils.py
+                        headersList.append("{}: {}".format(key, value)) # Create a header list
+                    inn = parseFile(singleFile)
+                    inn["headers"] = headersList # Add the headers 
+                    ansiout += outputs.printAnsi(inn) # make an option
+                    if add2db:
+                        inn["url"] = l
+                        elasticPost(inn)
+                except:
+                    #ansiout += "Error with {}\n".format(l)
+                    continue
+        ansiout += endline
+        print(ansiout)
+        if args.htmlout:
+            outpath = outputs.generateHTML(ansiout,CONFIG["web"]["in_path"],CONFIG["web"]["fqdn"])
+            print("HTML output is here! {}".format(outpath))
+
+    ###-- Processing files from remote directory -------------------------------
     elif rDirectory:
-        fpath = parseDir(rDirectory,fpath)
+        fpath = rDownload.parseDir(rDirectory,fpath)
         dirlist = rGlob(fpath,"*")
         if len(dirlist) > 0:
-            print("{}{} + Printing information for all files scraped from {}{}{}".format(side,e,cCYAN,rDirectory,e))
+            ansiout += "{}{} + Analyzing all files scraped from {}{}{}\n".format(side,e,cCYAN,rDirectory,e)
             for ff in dirlist:
-                inn = parseFile(ff)
-                if add2db:
-                    inn["url"] = rDirectory
-                    elasticPost(inn)
+                try:
+                  inn = parseFile(ff)
+                  ansiout += outputs.printAnsi(inn)
+                  if add2db:
+                      inn["url"] = rDirectory
+                      elasticPost(inn)
+                except:
+                    ansiout += "Couldn't process {}...continuing!\n".format(ff)
+                    continue
+            ansiout += endline
+            print(ansiout)
+            if args.htmlout:
+                outpath = outputs.generateHTML(ansiout,CONFIG["web"]["in_path"],CONFIG["web"]["fqdn"])
+                print("HTML output is here! {}".format(outpath))
         else:
             print("{}{}{} [!] No files downloaded!{}".format(side,e,cRED,e))
-            print(endline)
             sys.exit(1)
-    print(endline)

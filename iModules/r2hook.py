@@ -1,6 +1,14 @@
 import r2pipe
 import json
  
+try:
+    from iModules.helper import *
+except ImportError:
+    from helper import *
+
+if CONFIG["analyst_opts"]["telf_hash"]:
+    import telfhash
+
 ### Constants for Radare2 for future use
 coreMeta = [ "block",
              "fd",
@@ -56,3 +64,18 @@ def getBinInfo(inputfile):
     r2out = r.cmd('ij')
     binInfo = json.loads(r2out)
     return binInfo
+
+def getSymbols(inputfile):
+    r = r2pipe.open(inputfile)
+    r2out = r.cmd('is')
+    symInfo = json.loads(r2out)
+    return symInfo
+
+
+def telfhasher(elffile):
+    if CONFIG["analyst_opts"]["telf_hash"]:
+        t = telfhash.telfhash(elffile)
+        return t[0]['telfhash']
+    else:
+        return 0
+

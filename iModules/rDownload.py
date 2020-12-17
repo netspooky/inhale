@@ -2,6 +2,7 @@ from html.parser import HTMLParser
 from urllib.request import urlopen 
 import os
 import re
+import requests
 
 re_url = re.compile(r'^(([a-zA-Z_-]+)://([^/]+))(/.*)?$')
 
@@ -15,6 +16,9 @@ cYEL  = "\033[1;33m"
 cPNK  = "\033[38;5;219m"
 e     = "\033[0m"
 side  = cPNK+"│"+cCYAN
+divline   = cPNK+"├"+"─"*79+e
+
+### For recursive donwloads
 
 def resolve_link(link, url):
     m = re_url.match(link)
@@ -95,3 +99,37 @@ def download_directory(url, target):
     except:
         print("{}{}   {}> FAILED!{}".format(side,e,cRED,e))
         pass
+
+### File Scraping ##############################################################
+
+# Grab a single file from a URL 
+def getSingleFile(fUrl,fpath):
+    fOutput = ""
+    fOutput += divline + "\n"
+    fOutput += "{}{} Grabbing file from {}...\n".format(side,e,fUrl)
+    rfile = fUrl.split("/")[-1:]
+    url = re.compile(r"https?://")
+    urlDir = url.sub('',fUrl.strip().strip('/'))
+    fpath = fpath + urlDir
+    try:
+        dlfile = requests.get(fUrl,timeout=5)
+        if dlfile.status_code >= 400:
+            fOutput += "{}{}   {}> FAILED! Server status code was: {} {}\n".format(side,e,cRED,dlfile.status_code,e)
+            return 0, 0, fOutput
+        dlheaders = dlfile.headers 
+        os.makedirs(os.path.dirname(fpath),exist_ok=True)
+        open(fpath, 'wb').write(dlfile.content)
+        return fpath, dlheaders, fOutput
+    except:
+        fOutput += "{}{}   {}> FAILED!{}".format(side,e,cRED,e)
+        return 0, 0, fOutput
+
+# Parse a remote directory and give the path back to the main function
+def parseDir(rDirectory,fpath):
+    url = re.compile(r"https?://")
+    urlDir = url.sub('',rDirectory.strip().strip('/'))
+    fpath = fpath + urlDir
+    print("{}{} Scraping files... saving to {}{}{}".format(side,e,cCYAN,fpath,e))
+    os.makedirs(os.path.dirname(fpath),exist_ok=True)
+    download_directory(rDirectory,fpath)
+    return fpath
