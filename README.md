@@ -17,6 +17,8 @@ or a low cost computer like a Raspberry Pi.
 
 This tool is built to run on Linux using Python3, ElasticSearch, radare2, yara and binwalk. jq is also needed to pretty print output from the database. Here are some of the basic instructions to install.
 
+There's a bunch of things in the config.yml file that aren't actually set up yet, just leave them be unless otherwise stated in this documentation.
+
 ### Python3
 
 Install requirements
@@ -24,6 +26,8 @@ Install requirements
     python3 -m pip install -r requirements.txt
 
 ### Installing ElasticSearch (Debian)
+
+A database is not required to use Inhale, but if you would like to set one up, just follow these instructions and set the config.yml option "enable_database" to True.
 
 [Documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html)
 
