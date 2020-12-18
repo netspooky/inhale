@@ -2,4 +2,5 @@ filemagic
 elasticsearch
 r2pipe
 yara-python
-pefileansi2html
+pefile
+ansi2html
