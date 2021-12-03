@@ -39,7 +39,7 @@ A database is not required to use Inhale, but if you would like to set one up, j
 
 You can also install manually by following [this documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/targz.html)
 
-Additionally you can [set up a full ELK stack](https://logz.io/learn/complete-guide-elk-stack/#installing-elk) for visualization and data analysis purposes. It is not necessary for using this tool.
+Additionally you can [set up a full ELK stack](https://logit.io/blog/post/elk-stack-guide) for visualization and data analysis purposes. It is not necessary for using this tool.
 
 ### Installing radare2
 
@@ -152,10 +152,6 @@ Download everything in this remote directory, tag it all as "phishing":
     python3 inhale.py -r http://someurl.com/opendir/ -t phishing
 
 PROTIP: Use [this](https://twitter.com/search?q=%23opendir&f=live) Twitter hashtag search to find interesting open directories that possibly contain malware. Use at your own risk.
-
-### Yara
-
-You can pass your own yara rules with -y, this is a huge work in progress and almost everything in "YaraRules" is from https://github.com/kevthehermit/PasteHunter/tree/master/YaraRules. Shoutout [@KevTheHermit](https://twitter.com/kevthehermit)
 
 ### Querying the Database
 
